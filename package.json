@@ -1,0 +1,112 @@
+{
+    "name": "vscode-phpcs-fixer",
+    "displayName": "phpcs fixer",
+    "description": "PHPCS Fixer extension for VS Code, php formatter, php code beautify tool",
+    "version": "0.0.1",
+    "publisher": "satiromarra",
+    "author": "satiromarra",
+    "homepage": "https://github.com/satiromarra/vscode-phpcs-fixer",
+    "icon": "logo.png",
+    "badges": [
+      {
+        "description": "PayPal Donate",
+        "url": "https://img.shields.io/badge/Donate-PayPal-green.svg",
+        "href": "https://paypal.me/satiromarra"
+      }
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/satiromarra/vscode-phpcs-fixer.git"
+    },
+    "bugs": {
+      "url": "https://github.com/satiromarra/vscode-phpcs-fixer/issues"
+    },
+    "engines": {
+        "vscode": "^1.54.0"
+    },
+    "categories": [
+        "Formatters",
+        "Linters",
+        "Other"
+    ],
+    "activationEvents": [
+        "onLanguage:php"
+    ],
+    "main": "./out/extension",
+    "contributes": {
+        "commands": [
+            {
+                "command": "phpcsfixer.fix",
+                "title": "phpcsfixer: fix this file",
+                "when": "!inOutput && editorFocus && editorLangId == php"
+            }
+        ],
+        "configuration": {
+            "title": "PHP CS Fixer",
+            "type": "object",
+            "properties": {
+                "phpcsfixer.executablePath": {
+                    "type": "string",
+                    "default": "php-cs-fixer",
+                    "description": "Points to the php-cs-fixer executable, eg: win: php-cs-fixer.bat, other: php-cs-fixer; or points to php-cs-fixer.phar path, eg: /full/path/of/php-cs-fixer.phar",
+                    "scope": "resource"
+                },
+                "phpcsfixer.rules": {
+                    "type": [
+                        "string",
+                        "object"
+                    ],
+                    "default": "@PSR2",
+                    "description": "PHP CS Fixer level setting (@PSR1, @PSR2, @Symfony). Support json formatted value. @see: https://github.com/FriendsOfPHP/PHP-CS-Fixer",
+                    "scope": "resource"
+                },
+                "phpcsfixer.config": {
+                    "type": "string",
+                    "default": ".php-cs-fixer.php;.php-cs-fixer.dist.php;.php_cs;.php_cs.dist",
+                    "description": "config file (.php-cs-fixer.php, .php-cs-fixer.dist.php, .php_cs, .php_cs.dist or custom defined) can place in workspace root folder or .vscode folder or any other folder (full path)",
+                    "scope": "resource"
+                },
+                "phpcsfixer.onsave": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Execute PHP CS Fixer on save",
+                    "scope": "resource"
+                }
+            }
+        },
+        "menus": {
+            "explorer/context": [
+                {
+                    "when": "resourceLangId == php",
+                    "command": "phpcsfixer.fix",
+                    "group": "phpcsfixer"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run esbuild",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js",
+        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+        "esbuild": "npm run -S esbuild-base -- --minify",
+        "esbuild-watch": "npm run -S esbuild-base -- --watch --minify",
+        "makepackage": "vsce package -o dist/"
+    },
+    "devDependencies": {
+        "@types/node": "^12.11.7",
+        "@types/vscode": "^1.54.0",
+        "@typescript-eslint/eslint-plugin": "^4.14.1",
+        "@typescript-eslint/parser": "^4.14.1",
+        "esbuild": "^0.12.16",
+        "eslint": "^7.19.0",
+        "typescript": "^4.1.3",
+        "vscode-test": "^1.5.0"
+    },
+    "dependencies": {
+       
+    }
+}
