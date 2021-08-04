@@ -56,8 +56,10 @@ class PHPCSFIXER {
       return;
     }
     this.isReloadingConfig = true;
+    let f = workspace.getWorkspaceFolder(window.activeTextEditor?.document?.uri || workspace.workspaceFolders[0].uri)
     try {
-      this.config = workspace.getConfiguration("phpcsfixer") || <any>{};
+      this.config = workspace.getConfiguration("phpcsfixer", f.uri) || <any>{};
+      console.log(this.config)
     } catch (error) {
       console.error(error);
       this.isReloadingConfig = false;
