@@ -2,24 +2,24 @@
     "name": "vscode-phpcs-fixer",
     "displayName": "phpcs fixer",
     "description": "PHPCS Fixer extension for VS Code, php formatter, php code beautify tool",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "publisher": "satiromarra",
     "author": "satiromarra",
     "homepage": "https://github.com/satiromarra/vscode-phpcs-fixer",
     "icon": "logo.png",
     "badges": [
-      {
-        "description": "PayPal Donate",
-        "url": "https://img.shields.io/badge/Donate-PayPal-green.svg",
-        "href": "https://paypal.me/satiromarra"
-      }
+        {
+            "description": "PayPal Donate",
+            "url": "https://img.shields.io/badge/Donate-PayPal-green.svg",
+            "href": "https://paypal.me/satiromarra"
+        }
     ],
     "repository": {
         "type": "git",
         "url": "https://github.com/satiromarra/vscode-phpcs-fixer.git"
     },
     "bugs": {
-      "url": "https://github.com/satiromarra/vscode-phpcs-fixer/issues"
+        "url": "https://github.com/satiromarra/vscode-phpcs-fixer/issues"
     },
     "engines": {
         "vscode": "^1.54.0"
@@ -45,7 +45,7 @@
             "title": "PHP CS Fixer",
             "type": "object",
             "properties": {
-                "phpcsfixer.executablePath": {
+                "phpcsfixer.execPath": {
                     "type": "string",
                     "default": "php-cs-fixer",
                     "description": "Points to the php-cs-fixer executable, eg: win: php-cs-fixer.bat, other: php-cs-fixer; or points to php-cs-fixer.phar path, eg: /full/path/of/php-cs-fixer.phar",
@@ -71,6 +71,11 @@
                     "default": false,
                     "description": "Execute PHP CS Fixer on save",
                     "scope": "resource"
+                },
+                "phpcsfixer.lastUpdate": {
+                    "type": "integer",
+                    "default": 1,
+                    "description": "Last downloaded phar, 0 to disable"
                 }
             }
         },
@@ -107,6 +112,6 @@
         "vscode-test": "^1.5.0"
     },
     "dependencies": {
-       
+        "node-downloader-helper": "^1.0.18"
     }
 }

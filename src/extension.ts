@@ -31,15 +31,17 @@ import {
   TextEdit
 } from 'vscode';
 import { spawn } from 'child_process';
-import { existsSync, writeFileSync, unlink, readFileSync } from 'fs';
+import { existsSync, writeFileSync, unlink, readFileSync, chmodSync, chmod } from 'fs';
 import { isAbsolute } from 'path';
 import { homedir, tmpdir } from 'os'
+import { DownloaderHelper } from 'node-downloader-helper'
 
 interface Config extends WorkspaceConfiguration {
   execPath?: string;
   rules?: string | object;
   config?: string;
   onsave?: boolean;
+  lastUpdate?: number;
 }
 
 class PHPCSFIXER {
@@ -84,6 +86,7 @@ class PHPCSFIXER {
 
   public constructor() {
     this.initialize();
+    this.updatePhar();
   }
 
   public async initialize() {
@@ -211,7 +214,40 @@ class PHPCSFIXER {
         this.isFixing = false
       });
     });
+  }
 
+  public async updatePhar() {
+    setTimeout(() => {
+      let config = this.config;
+      let lastUpdate = config.get('lastUpdate', 1)
+      if (lastUpdate == 0) return;
+      if (this.config.execPath == '${extensionPath}/php-cs-fixer.phar' && lastUpdate + 1000 * 604800 < (new Date()).getTime()) {
+        let _opts = {
+          'fileName': 'php-cs-fixer.phar',
+          'override': true
+        }
+        if (existsSync(__dirname + '/' + _opts.fileName)) {
+          unlink(__dirname + '/' + _opts.fileName, () => { });
+        }
+        let dl = new DownloaderHelper('https://cs.symfony.com/download/php-cs-fixer-v3.phar', __dirname, _opts)
+        dl.on('end', () => {
+          config.update('lastUpdate', (new Date()).getTime(), true)
+          try {
+            chmod(__dirname + '/' + _opts.fileName, 0o755, () => {
+              console.log("make it executable!");
+            })
+          } catch (error) {
+            console.log(error)
+          } finally {
+
+          }
+        })
+        dl.on('error', (err) => {
+          console.log(err)
+        })
+        dl.start()
+      }
+    }, 1000 * 10)
   }
 
   public async onDidSaveTextDocument(document: TextDocument) {
