@@ -1,5 +1,6 @@
 # Change Log (vscode-phpcs-fixer)
-
+## 0.0.7 [November 2th, 2021; fifth release]
+- Download php-cs-fixer.phar support
 ## 0.0.4 [August 4th, 2021; fourth release]
 - Download php-cs-fixer.phar support
 ## 0.0.3 [August 4th, 2021; third release]

@@ -31,7 +31,7 @@ import {
   TextEdit
 } from 'vscode';
 import { spawn } from 'child_process';
-import { existsSync, writeFileSync, unlink, readFileSync, chmodSync, chmod } from 'fs';
+import { existsSync, writeFileSync, unlink, readFileSync, chmodSync, chmod, unlinkSync } from 'fs';
 import { isAbsolute } from 'path';
 import { homedir, tmpdir } from 'os'
 import { DownloaderHelper } from 'node-downloader-helper'
@@ -52,6 +52,7 @@ class PHPCSFIXER {
   private fixOnSave: Disposable;
   private realExecPath: string;
   private execPath: string;
+  public _rp: Boolean = false;
 
   private readConfig() {
     if (this.isReloadingConfig) {
@@ -61,13 +62,13 @@ class PHPCSFIXER {
     let f = workspace.getWorkspaceFolder(window.activeTextEditor?.document?.uri || workspace.workspaceFolders[0].uri)
     try {
       this.config = workspace.getConfiguration("phpcsfixer", f.uri) || <any>{};
-      console.log(this.config)
+      // console.log(this.config)
     } catch (error) {
-      console.error(error);
+      // console.error(error);
       this.isReloadingConfig = false;
       return;
     } finally {
-      console.log("finally")
+      // console.log("finally")
     }
     if (this.config.onsave && !this.fixOnSave) {
       this.fixOnSave = workspace.onDidSaveTextDocument(document => {
@@ -93,6 +94,11 @@ class PHPCSFIXER {
     this.readConfig();
   }
 
+  public onSave(): boolean {
+    this.readConfig();
+    return this.config.onsave;
+  }
+
   public async onDidChangeConfiguration() {
     this.readConfig();
   }
@@ -109,7 +115,10 @@ class PHPCSFIXER {
       let oText = document.getText()
       let lLine = document.lineAt(document.lineCount - 1)
       let range = new Range(new Position(0, 0), lLine.range.end)
-
+      if (this.isFixing) {
+        resolve([]);
+        return;
+      }
       this.fixDocument(oText).then((text: string) => {
         if (text != oText) {
           resolve([new TextEdit(range, text)])
@@ -117,7 +126,7 @@ class PHPCSFIXER {
           resolve([])
         }
       }).catch(err => {
-        console.log(err)
+        // console.log("ERR: " + err)
         reject(err)
       })
     });
@@ -164,7 +173,12 @@ class PHPCSFIXER {
 
   public async fixDocument(text: string): Promise<string> {
     if (this.isFixing) {
-      return
+      this.isFixing
+      // console.log(this.isFixing, this._rp);
+      return new Promise((resolve, reject) => {
+        //reject("pi pi pi");
+        resolve(text);
+      });
     }
     this.isFixing = true
     const filePath = tmpdir() + window.activeTextEditor.document.uri.fsPath.replace(/^.*[\\/]/, '/')
@@ -173,7 +187,7 @@ class PHPCSFIXER {
     args.push(filePath)
     const process = spawn(this.realExecPath || this.execPath, args);
     process.stdout.on('data', buffer => {
-      // console.log(buffer.toString())
+      //console.log(buffer.toString())
     });
     process.stderr.on('data', buffer => {
       let err = buffer.toString();
@@ -190,11 +204,15 @@ class PHPCSFIXER {
       });
       process.on('exit', (code) => {
         if (code == 0) {
-          let fixed = readFileSync(filePath, 'utf-8')
-          if (fixed.length > 0) {
-            resolve(fixed)
-          } else {
-            reject();
+          try {
+            let fixed = readFileSync(filePath, 'utf-8')
+            if (fixed.length > 0) {
+              resolve(fixed)
+            } else {
+              reject();
+            }
+          } catch (err) {
+            reject(err)
           }
           showView('success', 'PHP CS Fixer: Fixed all files!');
         } else {
@@ -210,8 +228,11 @@ class PHPCSFIXER {
             showView('error', msg)
           reject(msg)
         }
-        unlink(filePath, (err) => { })
+        // console.log('fix', this.isFixing)
+        unlinkSync(filePath)
         this.isFixing = false
+        this._rp = false;
+        // console.log('rp', this._rp);
       });
     });
   }
@@ -226,24 +247,24 @@ class PHPCSFIXER {
           'fileName': 'php-cs-fixer.phar',
           'override': true
         }
-        if (existsSync(__dirname + '/' + _opts.fileName)) {
-          unlink(__dirname + '/' + _opts.fileName, () => { });
-        }
+        //if (existsSync(__dirname + '/' + _opts.fileName)) {
+        //  unlink(__dirname + '/' + _opts.fileName, () => { });
+        //}
         let dl = new DownloaderHelper('https://cs.symfony.com/download/php-cs-fixer-v3.phar', __dirname, _opts)
         dl.on('end', () => {
           config.update('lastUpdate', (new Date()).getTime(), true)
           try {
             chmod(__dirname + '/' + _opts.fileName, 0o755, () => {
-              console.log("make it executable!");
+              // console.log("make it executable!");
             })
           } catch (error) {
-            console.log(error)
+            // console.log(error)
           } finally {
-
+            // holi
           }
         })
         dl.on('error', (err) => {
-          console.log(err)
+          // console.log(err)
         })
         dl.start()
       }
@@ -254,7 +275,8 @@ class PHPCSFIXER {
     if (document.languageId !== 'php') {
       return;
     }
-    if (this.config.onsave === true) {
+    if (this.config.onsave === true && this._rp === false) {
+      this._rp = true;
       commands.executeCommand("editor.action.formatDocument")
     }
   }
@@ -289,19 +311,34 @@ const WD: PHPCSFIXER = new PHPCSFIXER();
 
 export async function activate(context: ExtensionContext) {
   WD.onDidChangeConfiguration();
-  context.subscriptions.push(workspace.onDidSaveTextDocument(async (e: TextDocument) => {
+  /*context.subscriptions.push(workspace.onDidSaveTextDocument(async (e: TextDocument) => {
     WD.onDidSaveTextDocument(e);
-  }));
+  }));*/
   context.subscriptions.push(workspace.onDidChangeConfiguration(async (e: ConfigurationChangeEvent) => {
     WD.onDidChangeConfiguration();
   }));
+  context.subscriptions.push(workspace.onWillSaveTextDocument((event) => {
+    // WD.onDidSaveTextDocument(event.document)
+    if (event.document.languageId == 'php' && WD.onSave() && WD._rp === false) {
+      WD._rp = true;
+      event.waitUntil(commands.executeCommand("editor.action.formatDocument"))
+    }
+  }));
+
   context.subscriptions.push(commands.registerTextEditorCommand('phpcsfixer.fix', async (textEditor: TextEditor) => {
-    commands.executeCommand("editor.action.formatDocument")
+    // WD.onDidSaveTextDocument(textEditor.document)
+    if (WD._rp === false) {
+      WD._rp = true;
+      commands.executeCommand("editor.action.formatDocument")
+    }
   }));
   context.subscriptions.push(languages.registerDocumentFormattingEditProvider('php', {
     provideDocumentFormattingEdits: (document, options, token) => {
+      if (WD._rp === false) {
+        return [];
+      }
       return WD.registerDocumentProvider(document, options);
-    },
+    }
   }))
 }
 export async function deactivate() {
