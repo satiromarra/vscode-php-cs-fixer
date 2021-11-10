@@ -2,7 +2,7 @@
     "name": "vscode-phpcs-fixer",
     "displayName": "phpcs fixer",
     "description": "PHPCS Fixer extension for VS Code, php formatter, php code beautify tool",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "publisher": "satiromarra",
     "author": "satiromarra",
     "homepage": "https://github.com/satiromarra/vscode-phpcs-fixer",
