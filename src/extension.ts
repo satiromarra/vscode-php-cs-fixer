@@ -52,6 +52,7 @@ class PHPCSFIXER {
   private fixOnSave: Disposable;
   private realExecPath: string;
   private execPath: string;
+
   public _rp: Boolean = false;
 
   private readConfig() {
@@ -108,9 +109,18 @@ class PHPCSFIXER {
     if (f != undefined) {
       return f.uri.fsPath
     }
+    if (workspace.workspaceFolders != undefined) {
+      return workspace.workspaceFolders[0].uri.fsPath
+    }
     return
   }
-  public registerDocumentProvider(document, options): Promise<TextEdit[]> {
+
+  public registerDocumentProvider(document: TextDocument, options): Promise<TextEdit[]> {
+    if (window.activeTextEditor == undefined
+      || (window.activeTextEditor.document.uri.toString() != document.uri.toString())) {
+      return
+    }
+
     return new Promise((resolve, reject) => {
       let oText = document.getText()
       let lLine = document.lineAt(document.lineCount - 1)
@@ -185,24 +195,20 @@ class PHPCSFIXER {
     writeFileSync(filePath, text)
     const args = this.getArgs()
     args.push(filePath)
-    const process = spawn(this.realExecPath || this.execPath, args);
-    process.stdout.on('data', buffer => {
-      //console.log(buffer.toString())
-    });
-    process.stderr.on('data', buffer => {
-      let err = buffer.toString();
-      // console.error(err)
-      if (err.includes('Files that were not fixed due to errors reported during linting before fixing:')) {
-        showView('error', "phpcsfixer: php syntax error" + (err.split('before fixing:')[1]))
-      } else if (err.includes('Configuration file `.php_cs` is outdated, rename to `.php-cs-fixer.php`.')) {
-        showView('info', 'Configuration file `.php_cs` is outdated, rename to `.php-cs-fixer.php`.')
-      }
-    });
-    return new Promise((resolve, reject) => {
-      process.on("error", err => {
+    // console.log(this.realExecPath || this.execPath, args.join(' '));
+    let ev = process.env;
+    ev.PROJECT_WORKSPACE = ev.VSCODE_WORKSPACE = this.getActiveWorkspacePath() + '/';
+    let envi = {
+      cwd: process.cwd(),
+      env: ev
+    };
+    const prcs = spawn(this.realExecPath || this.execPath, args, envi);
+    let promise: Promise<string> = new Promise((resolve, reject) => {
+      prcs.on("error", err => {
         reject(err);
+        this.isFixing = false
       });
-      process.on('exit', (code) => {
+      prcs.on('exit', (code) => {
         if (code == 0) {
           try {
             let fixed = readFileSync(filePath, 'utf-8')
@@ -228,13 +234,30 @@ class PHPCSFIXER {
             showView('error', msg)
           reject(msg)
         }
+
         // console.log('fix', this.isFixing)
-        unlinkSync(filePath)
+        // unlinkSync(filePath)
+        unlink(filePath, function (err) {
+          //console.log("Deleted file: " + filePath)
+        })
         this.isFixing = false
         this._rp = false;
         // console.log('rp', this._rp);
       });
     });
+    prcs.stdout.on('data', buffer => {
+      // console.log(buffer.toString())
+    });
+    prcs.stderr.on('data', buffer => {
+      let err = buffer.toString();
+      // console.error(err)
+      if (err.includes('Files that were not fixed due to errors reported during linting before fixing:')) {
+        showView('error', "phpcsfixer: php syntax error" + (err.split('before fixing:')[1]))
+      } else if (err.includes('Configuration file `.php_cs` is outdated, rename to `.php-cs-fixer.php`.')) {
+        showView('info', 'Configuration file `.php_cs` is outdated, rename to `.php-cs-fixer.php`.')
+      }
+    });
+    return promise;
   }
 
   public async updatePhar() {
@@ -314,11 +337,10 @@ export async function activate(context: ExtensionContext) {
   /*context.subscriptions.push(workspace.onDidSaveTextDocument(async (e: TextDocument) => {
     WD.onDidSaveTextDocument(e);
   }));*/
-  context.subscriptions.push(workspace.onDidChangeConfiguration(async (e: ConfigurationChangeEvent) => {
-    WD.onDidChangeConfiguration();
-  }));
+
   context.subscriptions.push(workspace.onWillSaveTextDocument((event) => {
     // WD.onDidSaveTextDocument(event.document)
+    //console.log("onWillSaveTextDocument")
     if (event.document.languageId == 'php' && WD.onSave() && WD._rp === false) {
       WD._rp = true;
       event.waitUntil(commands.executeCommand("editor.action.formatDocument"))
@@ -327,15 +349,22 @@ export async function activate(context: ExtensionContext) {
 
   context.subscriptions.push(commands.registerTextEditorCommand('phpcsfixer.fix', async (textEditor: TextEditor) => {
     // WD.onDidSaveTextDocument(textEditor.document)
-    if (WD._rp === false) {
+    //console.log("registerTextEditorCommand")
+    if (WD._rp === false && textEditor.document.languageId == 'php') {
       WD._rp = true;
       commands.executeCommand("editor.action.formatDocument")
     }
   }));
+
+  context.subscriptions.push(workspace.onDidChangeConfiguration(async (e: ConfigurationChangeEvent) => {
+    WD.onDidChangeConfiguration();
+  }));
+
   context.subscriptions.push(languages.registerDocumentFormattingEditProvider('php', {
     provideDocumentFormattingEdits: (document, options, token) => {
+      //console.log("provideDocumentFormattingEdits", document.languageId)
       if (WD._rp === false) {
-        return [];
+        //return [];
       }
       return WD.registerDocumentProvider(document, options);
     }
