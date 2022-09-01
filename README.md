@@ -2,6 +2,8 @@
 
 [Visual Studio Code](https://code.visualstudio.com) extension, which fixes php files on save.
 
+[![VS Marketplace Version](https://vsmarketplacebadge.apphb.com/version-short/satiromarra.vscode-phpcs-fixer.svg)](https://marketplace.visualstudio.com/items?itemName=satiromarra.vscode-phpcs-fixer)
+
 ## Table of contents
 
 1. [Install](#install)

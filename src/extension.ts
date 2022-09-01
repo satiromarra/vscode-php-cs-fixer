@@ -28,11 +28,13 @@ import {
   languages,
   Range,
   Position,
-  TextEdit
+  TextEdit,
+  WorkspaceFolder,
+  Uri
 } from 'vscode';
 import { spawn } from 'child_process';
-import { existsSync, writeFileSync, unlink, readFileSync, chmodSync, chmod, unlinkSync } from 'fs';
-import { isAbsolute } from 'path';
+import { existsSync, writeFileSync, unlink, readFileSync, chmodSync, chmod, unlinkSync, renameSync } from 'fs';
+import { isAbsolute, join, normalize } from 'path';
 import { homedir, tmpdir } from 'os'
 import { DownloaderHelper } from 'node-downloader-helper'
 
@@ -79,11 +81,33 @@ class PHPCSFIXER {
       this.fixOnSave.dispose();
       this.fixOnSave = undefined;
     }
-    this.execPath = (this.config.execPath || (process.platform === "win32" ? 'php-cs-fixer.bat' : 'php-cs-fixer'))
-      .replace('${extensionPath}', __dirname)
-      .replace(/^~\//, homedir() + '/')
+    this.execPath = this.resolvePaths(this.config.execPath || (process.platform === "win32" ? 'php-cs-fixer.bat' : 'php-cs-fixer'));
     this.isReloadingConfig = false;
     return;
+  }
+
+  public resolvePaths(input: string, context: { uri?: Uri } = {}) {
+    const pattern = /^\$\{workspace(Root|Folder)\}/
+    if (pattern.test(input) && context.uri) {
+      const workspaceFolder = this.getActiveWorkspaceFolder(context.uri)
+      if (workspaceFolder !== null && workspaceFolder.uri.scheme === 'file') {
+        input = input.replace(pattern, workspaceFolder.uri.fsPath)
+      }
+    }
+    input = input.replace('${extensionPath}', __dirname)
+    input = input.replace(/^~\//, homedir() + '/')
+    return normalize(input)
+  }
+
+  public getActiveWorkspaceFolder(uri: Uri): WorkspaceFolder | undefined {
+    let candidate = workspace.getWorkspaceFolder(uri)
+    // Fallback to using the single root workspace's folder. Multi-root
+    // workspaces should not be used because its impossible to guess which one
+    // the developer intended to use.
+    if (candidate === undefined && workspace.workspaceFolders?.length === 1) {
+      candidate = workspace.workspaceFolders[0]
+    }
+    return candidate
   }
 
   public constructor() {
@@ -150,7 +174,8 @@ class PHPCSFIXER {
     let useConfig = false;
     this.realExecPath = undefined
     if (workspace.workspaceFolders != undefined) {
-      this.realExecPath = this.execPath.replace(/^\$\{workspace(Root|Folder)\}/, rootPath || workspace.workspaceFolders[0].uri.fsPath)
+      //this.realExecPath = this.execPath.replace(/^\$\{workspace(Root|Folder)\}/, rootPath || workspace.workspaceFolders[0].uri.fsPath)
+      this.realExecPath = this.resolvePaths(this.execPath)
     }
     if (rootPath !== undefined) {
       searchPaths = ['.vscode', ''].map(f => rootPath + '/' + (f ? f + '/' : ''))
@@ -267,7 +292,7 @@ class PHPCSFIXER {
       if (lastUpdate == 0) return;
       if (this.config.execPath == '${extensionPath}/php-cs-fixer.phar' && lastUpdate + 1000 * 604800 < (new Date()).getTime()) {
         let _opts = {
-          'fileName': 'php-cs-fixer.phar',
+          'fileName': 'php-cs-fixer.temp',
           'override': true
         }
         //if (existsSync(__dirname + '/' + _opts.fileName)) {
@@ -275,6 +300,8 @@ class PHPCSFIXER {
         //}
         let dl = new DownloaderHelper('https://cs.symfony.com/download/php-cs-fixer-v3.phar', __dirname, _opts)
         dl.on('end', () => {
+          unlinkSync(join(__dirname, 'php-cs-fixer.phar'))
+          renameSync(join(__dirname, 'php-cs-fixer.temp'), join(__dirname, 'php-cs-fixer.phar'))
           config.update('lastUpdate', (new Date()).getTime(), true)
           try {
             chmod(__dirname + '/' + _opts.fileName, 0o755, () => {
