@@ -1,8 +1,8 @@
-# vscode-phpcs-fixer README
+# vscode-php-cs-fixer README
 
 [Visual Studio Code](https://code.visualstudio.com) extension, which fixes php files on save.
 
-[![VS Marketplace Version](https://vsmarketplacebadge.apphb.com/version-short/satiromarra.vscode-phpcs-fixer.svg)](https://marketplace.visualstudio.com/items?itemName=satiromarra.vscode-phpcs-fixer)
+[![VS Marketplace Version](https://img.shields.io/vscode-marketplace/v/satiromarra.vscode-phpcs-fixer.svg?label=Version&color=green)](https://marketplace.visualstudio.com/items?itemName=satiromarra.vscode-phpcs-fixer)
 
 ## Table of contents
 
@@ -177,14 +177,14 @@ return (new PhpCsFixer\Config())
 
 If you like the extension, you can support the project by sending a [donation via PayPal](https://paypal.me/satiromarra) to [me](https://github.com/satiromarra).
 
-To contribute, you can [open an issue](https://github.com/satiromarra/vscode-phpcs-fixer/issues) and/or fork this repository.
+To contribute, you can [open an issue](https://github.com/satiromarra/vscode-php-cs-fixer/issues) and/or fork this repository.
 
 To work with the code:
 
-* clone [this repository](https://github.com/satiromarra/vscode-phpcs-fixer)
+* clone [this repository](https://github.com/satiromarra/vscode-php-cs-fixer)
 * create and change to a new branch, like `git checkout -b my_new_feature`
 * run `npm install` from your project folder
 * open that project folder in Visual Studio Code
 * now you can edit and debug there
 * commit your changes to your new branch and sync it with your forked GitHub repo
-* make a [pull request](https://github.com/satiromarra/vscode-phpcs-fixer/pulls)
+* make a [pull request](https://github.com/satiromarra/vscode-php-cs-fixer/pulls)
