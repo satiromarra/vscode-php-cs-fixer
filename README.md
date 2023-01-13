@@ -1,8 +1,8 @@
-# vscode-php-cs-fixer README
+# code-php-cs-fixer README
 
 [Visual Studio Code](https://code.visualstudio.com) extension, which fixes php files on save.
 
-[![VS Marketplace Version](https://img.shields.io/vscode-marketplace/v/satiromarra.vscode-phpcs-fixer.svg?label=Version&color=green)](https://marketplace.visualstudio.com/items?itemName=satiromarra.vscode-phpcs-fixer)
+[![VS Marketplace Version](https://img.shields.io/vscode-marketplace/v/satiromarra.code-php-cs-fixer.svg?label=Version&color=green)](https://marketplace.visualstudio.com/items?itemName=satiromarra.code-php-cs-fixer)
 
 ## Table of contents
 
@@ -16,10 +16,10 @@
 Launch VS Code Quick Open (`Ctrl + P`), paste the following command, and press enter:
 
 ```bash
-ext install vscode-phpcs-fixer
+ext install code-php-cs-fixer
 ```
 
-Or search for things like `vscode-phpcs-fixer` in your editor.
+Or search for things like `code-php-cs-fixer` in your editor.
 
 ### Install PHP-CS-FIXER Using Composer
 
@@ -174,8 +174,11 @@ return (new PhpCsFixer\Config())
 ```
 
 ## Support and contribute [[&uarr;](#table-of-contents)]
-
-If you like the extension, you can support the project by sending a [donation via PayPal](https://paypal.me/satiromarra) to [me](https://github.com/satiromarra).
+If you like the extension, you can support the project
+### Buy Me a Coffee
+[![Buy Me A Coffee](https://bmc-cdn.nyc3.digitaloceanspaces.com/BMC-button-images/custom_images/orange_img.png)](https://www.buymeacoffee.com/satiromarra)
+### PayPal
+[![PayPal Me](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://paypal.me/satiromarra)
 
 To contribute, you can [open an issue](https://github.com/satiromarra/vscode-php-cs-fixer/issues) and/or fork this repository.
 

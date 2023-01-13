@@ -1,8 +1,8 @@
 {
-    "name": "vscode-phpcs-fixer",
+    "name": "code-php-cs-fixer",
     "displayName": "php cs fixer",
     "description": "PHP CS Fixer extension for VS Code, php formatter, php code beautify tool",
-    "version": "0.1.3",
+    "version": "0.1.10",
     "publisher": "satiromarra",
     "author": "satiromarra",
     "homepage": "https://github.com/satiromarra/vscode-php-cs-fixer",
@@ -39,6 +39,11 @@
                 "command": "phpcsfixer.fix",
                 "title": "phpcsfixer: fix this file",
                 "when": "!inOutput && editorFocus && editorLangId == php"
+            },
+            {
+              "command": "phpcsfixer.diff",
+              "title": "phpcsfixer: view diff",
+              "when": "resourceLangId == php"
             }
         ],
         "configuration": {
@@ -76,6 +81,16 @@
                     "type": "integer",
                     "default": 1,
                     "description": "Last downloaded phar, 0 to disable"
+                },
+                "phpcsfixer.formattingProvider": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "register this extension as php document formatting provider."
+                },
+                "phpcsfixer.allowRisky": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Allow Risky?"
                 }
             }
         },
@@ -85,6 +100,11 @@
                     "when": "resourceLangId == php",
                     "command": "phpcsfixer.fix",
                     "group": "phpcsfixer"
+                },
+                {
+                  "when": "resourceLangId == php",
+                  "command": "phpcsfixer.diff",
+                  "group": "phpcsfixer"
                 }
             ]
         }

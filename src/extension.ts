@@ -34,7 +34,7 @@ import {
 } from 'vscode';
 import { spawn } from 'child_process';
 import { existsSync, writeFileSync, unlink, readFileSync, chmodSync, chmod, unlinkSync, renameSync } from 'fs';
-import { isAbsolute, join, normalize } from 'path';
+import { basename, isAbsolute, join, normalize } from 'path';
 import { homedir, tmpdir } from 'os'
 import { DownloaderHelper } from 'node-downloader-helper'
 
@@ -44,6 +44,8 @@ interface Config extends WorkspaceConfiguration {
   config?: string;
   onsave?: boolean;
   lastUpdate?: number;
+  formattingProvider?: boolean;
+  allowRisky?: boolean;
 }
 
 class PHPCSFIXER {
@@ -56,6 +58,7 @@ class PHPCSFIXER {
   private execPath: string;
 
   public _rp: Boolean = false;
+  public formattingProvider: boolean = true;
 
   private readConfig() {
     if (this.isReloadingConfig) {
@@ -82,6 +85,7 @@ class PHPCSFIXER {
       this.fixOnSave = undefined;
     }
     this.execPath = this.resolvePaths(this.config.execPath || (process.platform === "win32" ? 'php-cs-fixer.bat' : 'php-cs-fixer'));
+    this.formattingProvider = this.config.formattingProvider;
     this.isReloadingConfig = false;
     return;
   }
@@ -129,14 +133,72 @@ class PHPCSFIXER {
   }
 
   public getActiveWorkspacePath() {
-    let f = workspace.getWorkspaceFolder(window.activeTextEditor.document.uri)
-    if (f != undefined) {
-      return f.uri.fsPath
+    let u = window.activeTextEditor?.document?.uri;
+    if (u !== undefined) {
+      let f = workspace.getWorkspaceFolder(u);
+      if (f != undefined) {
+        return f.uri.fsPath
+      }
     }
     if (workspace.workspaceFolders != undefined) {
       return workspace.workspaceFolders[0].uri.fsPath
     }
     return
+  }
+  public registerDiffDocumentProvider(uri: Uri) {
+    this.fixDocument(readFileSync(uri.fsPath, 'utf-8'), uri, true, false)
+      .then((tempFilePath) => {
+        let fname = basename(uri.fsPath);
+        commands.executeCommand('vscode.diff', uri, Uri.file(tempFilePath), 'view diff: ' + fname)
+      })
+      .catch((err) => {
+        console.error(err)
+      });
+  }
+  public registerRangeDocumentProvider(document: TextDocument, range: Range): Promise<TextEdit[]> {
+    if (window.activeTextEditor == undefined
+      || (window.activeTextEditor.document.uri.toString() != document.uri.toString())) {
+      return
+    }
+    return new Promise((resolve, reject) => {
+      let oText = document.getText(range)
+      if (oText.replace(/\s+/g, '').length == 0) {
+        reject()
+        return
+      }
+      if (this.isFixing) {
+        resolve([]);
+        return;
+      }
+      let lastSpaces = oText.match(/(\n\s*)+$/)
+      let firstSpaces = oText.match(/^(\n\s*)+/)
+      let PHPTag = (oText.search(/^\s*<\?php/i) == -1)
+      if (PHPTag) {
+        oText = '<?php\n' + oText
+      }
+      this
+        .fixDocument(oText, document.uri, false, true)
+        .then((text: string) => {
+          if (PHPTag) {
+            // text = text.replace(/^<\?php\r?\n+/, '').replace(/\n$/, '')
+            text = text.replace(/^<\?php\r?(\n\s*)+/, '').replace(/(\n\s*)+$/, '')
+          }
+          if (firstSpaces) {
+            text = firstSpaces[0] + text
+          }
+          if (lastSpaces) {
+            text = text + lastSpaces[0]
+          }
+          if (text && text != oText) {
+            resolve([new TextEdit(range, text)])
+          } else {
+            resolve([])
+          }
+        }).catch(err => {
+          //console.log("ERR: " + err)
+          reject()
+        })
+    });
   }
 
   public registerDocumentProvider(document: TextDocument, options): Promise<TextEdit[]> {
@@ -153,16 +215,18 @@ class PHPCSFIXER {
         resolve([]);
         return;
       }
-      this.fixDocument(oText).then((text: string) => {
-        if (text != oText) {
-          resolve([new TextEdit(range, text)])
-        } else {
-          resolve([])
-        }
-      }).catch(err => {
-        // console.log("ERR: " + err)
-        reject(err)
-      })
+      this
+        .fixDocument(oText, document.uri, false, false)
+        .then((text: string) => {
+          if (text != oText) {
+            resolve([new TextEdit(range, text)])
+          } else {
+            resolve([])
+          }
+        }).catch(err => {
+          // console.log("ERR: " + err)
+          reject(err)
+        })
     });
   }
   public getArgs() {
@@ -203,47 +267,63 @@ class PHPCSFIXER {
         args.push('--rules=' + this.config.rules)
       }
     }
+    if (!useConfig && this.config.allowRisky) {
+      args.push('--allow-risky=yes');
+    }
     return args
   }
 
-  public async fixDocument(text: string): Promise<string> {
+  public async fixDocument(text: string, uri: Uri, diff: boolean = false, partial: boolean = false): Promise<string> {
     if (this.isFixing) {
-      this.isFixing
+      // this.isFixing
       // console.log(this.isFixing, this._rp);
       return new Promise((resolve, reject) => {
         //reject("pi pi pi");
-        resolve(text);
+        resolve(diff ? filePath : text);
       });
     }
+    let filePath: string
     this.isFixing = true
-    const filePath = tmpdir() + window.activeTextEditor.document.uri.fsPath.replace(/^.*[\\/]/, '/')
+    if (partial) {
+      filePath = tmpdir() + '/tmp-phpcsfixer-partial.php';
+    } else {
+      filePath = tmpdir() + uri.fsPath.replace(/^.*[\\/]/, '/')
+    }
     writeFileSync(filePath, text)
     const args = this.getArgs()
+    if (partial) {
+      args.push('-q')
+    }
     args.push(filePath)
-    // console.log(this.realExecPath || this.execPath, args.join(' '));
+    console.log(this.realExecPath || this.execPath, args.join(' '));
     let ev = process.env;
     ev.PROJECT_WORKSPACE = ev.VSCODE_WORKSPACE = this.getActiveWorkspacePath() + '/';
     let envi = {
       cwd: process.cwd(),
       env: ev
     };
+
     const prcs = spawn(this.realExecPath || this.execPath, args, envi);
     let promise: Promise<string> = new Promise((resolve, reject) => {
-      prcs.on("error", err => {
-        reject(err);
+      prcs.on("error", (err) => {
+        partial || reject(err);
         this.isFixing = false
       });
       prcs.on('exit', (code) => {
         if (code == 0) {
-          try {
-            let fixed = readFileSync(filePath, 'utf-8')
-            if (fixed.length > 0) {
-              resolve(fixed)
-            } else {
-              reject();
+          if (diff) {
+            resolve(filePath)
+          } else {
+            try {
+              let fixed = readFileSync(filePath, 'utf-8')
+              if (fixed.length > 0) {
+                resolve(fixed)
+              } else {
+                reject();
+              }
+            } catch (err) {
+              reject(err)
             }
-          } catch (err) {
-            reject(err)
           }
           showView('success', 'PHP CS Fixer: Fixed all files!');
         } else {
@@ -255,27 +335,32 @@ class PHPCSFIXER {
             'fallback': 'PHP CS Fixer: Unknown error.'
           }
           let msg = msgs[code in msgs ? code : 'fallback']
-          if (code != 16)
+          if (!partial && code != 16)
             showView('error', msg)
           reject(msg)
         }
 
         // console.log('fix', this.isFixing)
         // unlinkSync(filePath)
-        unlink(filePath, function (err) {
-          //console.log("Deleted file: " + filePath)
-        })
+        if (!diff && !partial) {
+          unlink(filePath, function (err) {
+            //console.log("Deleted file: " + filePath)
+          })
+        }
         this.isFixing = false
         this._rp = false;
         // console.log('rp', this._rp);
       });
     });
-    prcs.stdout.on('data', buffer => {
+    prcs.stdout.on('data', (buffer) => {
       // console.log(buffer.toString())
     });
-    prcs.stderr.on('data', buffer => {
+    prcs.stderr.on('data', (buffer) => {
       let err = buffer.toString();
-      // console.error(err)
+      if (partial) {
+        // console.error(err)
+        return
+      }
       if (err.includes('Files that were not fixed due to errors reported during linting before fixing:')) {
         showView('error', "phpcsfixer: php syntax error" + (err.split('before fixing:')[1]))
       } else if (err.includes('Configuration file `.php_cs` is outdated, rename to `.php-cs-fixer.php`.')) {
@@ -386,16 +471,31 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(workspace.onDidChangeConfiguration(async (e: ConfigurationChangeEvent) => {
     WD.onDidChangeConfiguration();
   }));
-
-  context.subscriptions.push(languages.registerDocumentFormattingEditProvider('php', {
-    provideDocumentFormattingEdits: (document, options, token) => {
-      //console.log("provideDocumentFormattingEdits", document.languageId)
-      if (WD._rp === false) {
-        //return [];
+  if (WD.formattingProvider) {
+    context.subscriptions.push(languages.registerDocumentFormattingEditProvider('php', {
+      provideDocumentFormattingEdits: (document, options, token) => {
+        return WD.registerDocumentProvider(document, options);
       }
-      return WD.registerDocumentProvider(document, options);
+    }));
+    context.subscriptions.push(languages.registerDocumentRangeFormattingEditProvider('php', {
+      provideDocumentRangeFormattingEdits(document, range, options, token) {
+        return WD.registerRangeDocumentProvider(document, range);
+      },
+    }));
+  }
+  context.subscriptions.push(commands.registerCommand('phpcsfixer.diff', (f) => {
+    if (f == undefined) {
+      let editor = window.activeTextEditor
+      if (editor != undefined && editor.document.languageId == 'php') {
+        f = editor.document.uri
+      }
     }
-  }))
+    if (f && f.scheme == 'file') {
+      WD.registerDiffDocumentProvider(f);
+    }
+  })
+  )
+
 }
 export async function deactivate() {
   WD.deactivate();
